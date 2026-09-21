@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import PageLayout from "../components/layout/PageLayout.jsx";
 import PriceChart from "../components/ui/PriceChart.jsx";
 import RangeSelector from "../components/ui/RangeSelector.jsx";
-import api from "../utils/api.js";
+import api, { fetchWithCache, invalidateCache, CACHE_TTLS } from "../utils/api.js";
 import { useToast } from "../context/ToastContext.jsx";
 import {
   Card,
@@ -41,11 +41,17 @@ export default function StockDetailPage() {
     setLoading(true);
     try {
       const [quoteRes, historyRes] = await Promise.all([
-        api.get(`/stocks/${symbol}`),
-        api.get(`/stocks/${symbol}/history`, { params: { range } }),
+        fetchWithCache(`/stocks/${symbol}`, {}, CACHE_TTLS.QUOTE),
+        fetchWithCache(
+          `/stocks/${symbol}/history`,
+          { params: { range } },
+          CACHE_TTLS.HISTORICAL,
+        ),
       ]);
-      setQuote(quoteRes.data.data.quote);
-      setHistory(historyRes.data.data.history);
+      setQuote(quoteRes.data?.data?.quote || quoteRes.data?.quote || null);
+      setHistory(
+        historyRes.data?.data?.history || historyRes.data?.history || [],
+      );
     } catch (error) {
       console.error(error);
       setLoadError(error);
@@ -109,7 +115,8 @@ export default function StockDetailPage() {
         `Order filled at ${formatCurrency(quote?.price)} per share.`,
       );
       setTradeError(null);
-      // refresh quote and history
+      // Invalidate cached quote and refresh
+      invalidateCache(`/stocks/${symbol}`);
       await loadData();
     } catch (err) {
       console.error("Trade execution error:", err);

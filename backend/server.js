@@ -9,6 +9,7 @@ import leaderboardRoutes from "./routes/leaderboardRoutes.js";
 import holdingsRoutes from "./routes/holdingsRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 import { authenticate } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -45,6 +46,7 @@ app.use("/api/profile", authenticate, profileRoutes);
 app.use("/api/trades", authenticate, tradeRoutes);
 app.use("/api/watchlist", authenticate, watchlistRoutes);
 app.use("/api/leaderboard", authenticate, leaderboardRoutes);
+app.use("/api/ai", authenticate, aiRoutes);
 
 app.use(errorHandler);
 

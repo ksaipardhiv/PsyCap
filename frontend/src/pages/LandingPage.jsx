@@ -94,12 +94,12 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto max-w-2xl text-base text-muted-foreground sm:text-xl">
-            Practice trading US equities with $100,000 in virtual capital. Real-time market data, interactive candlestick charts, and an AI Mentor that helps you understand your simulated trading behavior.
+            Practice trading US equities with $100,000 in virtual capital. Real-time market data, interactive candlestick charts, and AI Market Intelligence powered by machine learning.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-2 py-2">
             <Badge tone="primary" className="flex items-center gap-1">
-              <BrainIcon className="h-3 w-3" /> AI Mentor
+              <BrainIcon className="h-3 w-3" /> AI Market Intelligence
             </Badge>
             <Badge tone="secondary" className="flex items-center gap-1">Portfolio Insights</Badge>
             <Badge tone="secondary" className="flex items-center gap-1">Trading Behavior</Badge>

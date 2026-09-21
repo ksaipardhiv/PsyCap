@@ -189,11 +189,13 @@ export const BrainIcon = (p) => (
   </Svg>
 );
 
-export const AIMentorIcon = BrainIcon;
+export const AIMarketIcon = BrainIcon;
 
-export const SendIcon = (p) => (
+export const RefreshIcon = (p) => (
   <Svg {...p}>
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+    <path d="M16 21h5v-5" />
   </Svg>
 );

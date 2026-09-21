@@ -12,7 +12,6 @@ import WatchlistPage from "./pages/WatchlistPage.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
-import MentorPage from "./pages/MentorPage.jsx";
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -38,15 +37,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/mentor"
-        element={
-          <ProtectedRoute>
-            <MentorPage />
           </ProtectedRoute>
         }
       />

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PageLayout from "../components/layout/PageLayout.jsx";
-import api from "../utils/api.js";
+import api, { fetchWithCache, CACHE_TTLS } from "../utils/api.js";
+import DashboardAIMarketIntelligence from "../components/dashboard/DashboardAIMarketIntelligence.jsx";
 import {
   Card,
   Badge,
@@ -35,20 +36,43 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [portfolioRes, stocksRes, watchlistRes, transactionsRes] =
-          await Promise.all([
+        const [portfolioResult, stocksResult, watchlistResult, transactionsResult] =
+          await Promise.allSettled([
             api.get("/portfolio"),
-            api.get("/stocks"),
+            fetchWithCache("/stocks", {}, CACHE_TTLS.QUOTE),
             api.get("/watchlist"),
             api.get("/transactions"),
           ]);
-        setPortfolio(portfolioRes.data.data.portfolio);
-        setStocks(stocksRes.data.data.stocks.slice(0, 6));
-        // Watchlist is still fetched to keep the request contract intact.
-        void watchlistRes.data.data.watchlist;
-        setTransactions(transactionsRes.data.data.transactions.slice(0, 5));
+
+        if (portfolioResult.status === "fulfilled") {
+          setPortfolio(portfolioResult.value?.data?.data?.portfolio || null);
+        } else {
+          console.warn("Failed to load portfolio:", portfolioResult.reason);
+        }
+
+        if (stocksResult.status === "fulfilled") {
+          const rawStocks =
+            stocksResult.value?.data?.data?.stocks ||
+            stocksResult.value?.data?.stocks ||
+            [];
+          setStocks(rawStocks.slice(0, 6));
+        } else {
+          console.warn("Failed to load market stocks:", stocksResult.reason);
+        }
+
+        if (watchlistResult.status === "fulfilled") {
+          void watchlistResult.value;
+        }
+
+        if (transactionsResult.status === "fulfilled") {
+          const rawTxns =
+            transactionsResult.value?.data?.data?.transactions || [];
+          setTransactions(rawTxns.slice(0, 5));
+        } else {
+          console.warn("Failed to load transactions:", transactionsResult.reason);
+        }
       } catch (error) {
-        console.error(error);
+        console.error("Dashboard load error:", error);
       } finally {
         setLoading(false);
       }
@@ -120,7 +144,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="mt-4 space-y-2">
-                <QuickLink to="/mentor" label="AI Mentor insights" />
+                <QuickLink to="/watchlist" label="View watchlist" />
                 <QuickLink to="/stocks" label="Browse markets" />
                 <QuickLink to="/portfolio" label="View holdings" />
                 <QuickLink to="/leaderboard" label="See leaderboard" />
@@ -248,6 +272,9 @@ export default function DashboardPage() {
               </div>
             </Card>
           </div>
+
+          {/* AI Market Intelligence Section */}
+          <DashboardAIMarketIntelligence stocks={stocks} />
         </div>
       )}
     </PageLayout>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PageLayout from "../components/layout/PageLayout.jsx";
-import api from "../utils/api.js";
+import api, { fetchWithCache, CACHE_TTLS } from "../utils/api.js";
 import {
   Card,
   DeltaPill,
@@ -22,10 +22,11 @@ export default function StocksPage() {
   useEffect(() => {
     async function loadStocks() {
       try {
-        const response = await api.get("/stocks");
-        setStocks(response.data.data.stocks);
+        const response = await fetchWithCache("/stocks", {}, CACHE_TTLS.QUOTE);
+        const data = response.data?.data?.stocks || response.data?.stocks || [];
+        setStocks(data);
       } catch (error) {
-        console.error(error);
+        console.error("Failed to load stocks:", error);
       } finally {
         setLoading(false);
       }
