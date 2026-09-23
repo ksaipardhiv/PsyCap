@@ -96,9 +96,52 @@ class DecisionNode {
 }
 
 /**
+ * Generates a deterministic integer seed from the dataset features, labels, and stock symbol.
+ * If market data changes (new prices, returns, or volumes), the seed changes accordingly.
+ */
+function createDatasetSeed(dataset, symbol = "") {
+  let hash = 2166136261;
+  const str = symbol + ":" + (dataset ? dataset.length : 0);
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  if (Array.isArray(dataset)) {
+    for (let i = 0; i < dataset.length; i++) {
+      const item = dataset[i];
+      const labelCode = item.label === "bullish" ? 1 : item.label === "bearish" ? 2 : 0;
+      hash ^= labelCode;
+      hash = Math.imul(hash, 16777619);
+      if (Array.isArray(item.features)) {
+        for (let j = 0; j < item.features.length; j++) {
+          const val = Math.round((item.features[j] || 0) * 1000);
+          hash ^= val;
+          hash = Math.imul(hash, 16777619);
+        }
+      }
+    }
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Mulberry32: A fast, high-quality 32-bit seeded pseudo-random number generator.
+ * Returns a function that outputs numbers in [0, 1), identical to Math.random() interface.
+ */
+function createSeededRandom(seed) {
+  let state = seed ? seed >>> 0 : 1337;
+  return function () {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
  * Builds a single Decision Tree on a sample
  */
-function buildTree(data, depth = 0, maxDepth = 3) {
+function buildTree(data, depth = 0, maxDepth = 3, rng = Math.random) {
   if (data.length === 0) return new DecisionNode({ prediction: "neutral" });
 
   const classes = data.map((d) => d.label);
@@ -120,7 +163,7 @@ function buildTree(data, depth = 0, maxDepth = 3) {
   const numFeatures = data[0].features.length;
   const featureSubset = [];
   while (featureSubset.length < Math.max(2, Math.floor(Math.sqrt(numFeatures)))) {
-    const idx = Math.floor(Math.random() * numFeatures);
+    const idx = Math.floor(rng() * numFeatures);
     if (!featureSubset.includes(idx)) featureSubset.push(idx);
   }
 
@@ -156,8 +199,8 @@ function buildTree(data, depth = 0, maxDepth = 3) {
     return new DecisionNode({ prediction: majority });
   }
 
-  const leftNode = buildTree(bestSplit.left, depth + 1, maxDepth);
-  const rightNode = buildTree(bestSplit.right, depth + 1, maxDepth);
+  const leftNode = buildTree(bestSplit.left, depth + 1, maxDepth, rng);
+  const rightNode = buildTree(bestSplit.right, depth + 1, maxDepth, rng);
 
   return new DecisionNode({
     featureIndex: bestSplit.featureIndex,
@@ -192,8 +235,9 @@ function calculateGiniGain(parent, left, right) {
  * Random Forest Classifier
  */
 class RandomForestClassifier {
-  constructor(numTrees = 15) {
+  constructor(numTrees = 15, seed = null) {
     this.numTrees = numTrees;
+    this.seed = seed;
     this.trees = [];
   }
 
@@ -201,13 +245,15 @@ class RandomForestClassifier {
     this.trees = [];
     if (!dataset || dataset.length < 5) return;
 
+    const rng = this.seed !== null ? createSeededRandom(this.seed) : Math.random;
+
     for (let i = 0; i < this.numTrees; i++) {
       const sample = [];
       for (let j = 0; j < dataset.length; j++) {
-        const randIdx = Math.floor(Math.random() * dataset.length);
+        const randIdx = Math.floor(rng() * dataset.length);
         sample.push(dataset[randIdx]);
       }
-      const tree = buildTree(sample);
+      const tree = buildTree(sample, 0, 3, rng);
       this.trees.push(tree);
     }
   }
@@ -468,7 +514,8 @@ export async function getStockInsights(symbol, refresh = false) {
 
   const { dataset, currentFeatures, indicators } = extractFeatures(history);
 
-  const forest = new RandomForestClassifier(15);
+  const seed = createDatasetSeed(dataset, normSymbol);
+  const forest = new RandomForestClassifier(15, seed);
   forest.train(dataset);
 
   const { trend, confidence } = forest.predict(currentFeatures);
