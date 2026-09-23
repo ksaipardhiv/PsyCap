@@ -1,5 +1,5 @@
 import axios from "axios";
-import { cacheGet, cacheSet } from "../utils/cache.js";
+import { cacheGet, cacheGetStale, cacheSet } from "../utils/cache.js";
 
 const BASE_URL = "https://api.twelvedata.com";
 
@@ -20,6 +20,8 @@ const popularSymbols = [
   { symbol: "AMZN", name: "Amazon.com, Inc." },
   { symbol: "TSLA", name: "Tesla, Inc." },
 ];
+
+const inFlightHistoricalRequests = new Map();
 
 function getApiKey() {
   const key = process.env.TWELVEDATA_API_KEY;
@@ -356,31 +358,72 @@ async function getHistoricalData(symbol, range) {
   const cacheKey = `history:${normalizedSymbol}:${validRange}`;
 
   const cached = cacheGet(cacheKey);
-
   if (cached) {
     return cached;
   }
 
-  const data = await getProvider().getHistoricalData(
-    normalizedSymbol,
-    interval,
-    outputsize,
-  );
+  // Deduplicate concurrent in-flight requests for the same symbol & range
+  if (inFlightHistoricalRequests.has(cacheKey)) {
+    return inFlightHistoricalRequests.get(cacheKey);
+  }
 
-  const history = (data?.values || [])
-    .map((item) => ({
-      datetime: item.datetime,
-      open: Number(item.open),
-      high: Number(item.high),
-      low: Number(item.low),
-      close: Number(item.close),
-      volume: Number(item.volume),
-    }))
-    .reverse();
+  const fetchPromise = (async () => {
+    try {
+      let data;
+      try {
+        data = await getProvider().getHistoricalData(
+          normalizedSymbol,
+          interval,
+          outputsize,
+        );
+      } catch (err) {
+        // If rate-limited or transient provider error, wait 1.2s and retry once
+        if (/rate limit|too many requests|credits|unavailable|timeout/i.test(err.message || "")) {
+          const stale = cacheGetStale(cacheKey);
+          if (stale && Array.isArray(stale) && stale.length >= 5) {
+            return stale;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          data = await getProvider().getHistoricalData(
+            normalizedSymbol,
+            interval,
+            outputsize,
+          );
+        } else {
+          throw err;
+        }
+      }
 
-  cacheSet(cacheKey, history, 30 * 60);
+      const history = (data?.values || [])
+        .map((item) => ({
+          datetime: item.datetime,
+          open: Number(item.open),
+          high: Number(item.high),
+          low: Number(item.low),
+          close: Number(item.close),
+          volume: Number(item.volume),
+        }))
+        .reverse();
 
-  return history;
+      if (history.length > 0) {
+        cacheSet(cacheKey, history, 30 * 60);
+      }
+
+      return history;
+    } catch (err) {
+      // If external provider failed, serve stale cached data if available
+      const stale = cacheGetStale(cacheKey);
+      if (stale && Array.isArray(stale) && stale.length >= 5) {
+        return stale;
+      }
+      throw err;
+    } finally {
+      inFlightHistoricalRequests.delete(cacheKey);
+    }
+  })();
+
+  inFlightHistoricalRequests.set(cacheKey, fetchPromise);
+  return fetchPromise;
 }
 
 /*

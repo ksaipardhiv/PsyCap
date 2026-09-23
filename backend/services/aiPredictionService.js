@@ -1,5 +1,5 @@
 import marketDataService from "./marketDataService.js";
-import { cacheGet, cacheSet, cacheDelete } from "../utils/cache.js";
+import { cacheGet, cacheGetStale, cacheSet, cacheDelete } from "../utils/cache.js";
 
 export const AI_CACHE_TTL_SECONDS = 600; // 10 minutes
 
@@ -492,6 +492,8 @@ function getSectorMarketContext(symbol) {
   return "Broad equity market sentiment and sector-wide macroeconomic factors may be contributing to current price dynamics.";
 }
 
+const inFlightAiRequests = new Map();
+
 /**
  * Main service method: get AI Market Intelligence for a symbol
  */
@@ -507,48 +509,84 @@ export async function getStockInsights(symbol, refresh = false) {
     cacheDelete(cacheKey);
   }
 
-  const history = await marketDataService.getHistoricalData(normSymbol, "3M");
-  if (!history || !Array.isArray(history) || history.length < 5) {
-    throw new Error("Insufficient historical market data to run prediction model");
+  // Deduplicate concurrent in-flight AI requests for the same symbol
+  const inFlightKey = `${normSymbol}:${refresh}`;
+  if (inFlightAiRequests.has(inFlightKey)) {
+    return inFlightAiRequests.get(inFlightKey);
   }
 
-  const { dataset, currentFeatures, indicators } = extractFeatures(history);
+  const aiPromise = (async () => {
+    try {
+      let history;
+      try {
+        history = await marketDataService.getHistoricalData(normSymbol, "3M");
+      } catch (err) {
+        // If external call failed due to rate limiting or timeout, check for stale insights
+        const staleInsights = cacheGetStale(cacheKey);
+        if (staleInsights) {
+          return staleInsights;
+        }
+        throw err;
+      }
 
-  const seed = createDatasetSeed(dataset, normSymbol);
-  const forest = new RandomForestClassifier(15, seed);
-  forest.train(dataset);
+      if (!history || !Array.isArray(history) || history.length < 5) {
+        const staleInsights = cacheGetStale(cacheKey);
+        if (staleInsights) {
+          return staleInsights;
+        }
+        throw new Error("Insufficient historical market data to run prediction model");
+      }
 
-  const { trend, confidence } = forest.predict(currentFeatures);
-  const signals = buildTechnicalSignals(indicators);
-  const sectorContext = getSectorMarketContext(normSymbol);
+      const { dataset, currentFeatures, indicators } = extractFeatures(history);
 
-  const result = {
-    symbol: normSymbol,
-    trend, // "bullish" | "bearish" | "neutral"
-    prediction: trend.charAt(0).toUpperCase() + trend.slice(1), // "Bullish" | "Bearish" | "Neutral"
-    confidence, // e.g. 78
-    horizon: "5–10 Trading Days",
-    signals,
-    events: [],
-    events_summary: "No major external event was identified from the available data.",
-    external_factors: [sectorContext],
-    risks: [
-      "Market volatility",
-      "Prediction uncertainty",
-      "Macroeconomic shifts",
-    ],
-    model: {
-      name: "Random Forest",
-      type: "Ensemble Classifier",
-      updatedAt: new Date().toISOString(),
-    },
-    news_status: "ready_for_news_provider",
-    disclaimer:
-      "AI predictions are statistical estimates for simulated trading and are not guaranteed financial advice.",
-  };
+      const seed = createDatasetSeed(dataset, normSymbol);
+      const forest = new RandomForestClassifier(15, seed);
+      forest.train(dataset);
 
-  cacheSet(cacheKey, result, AI_CACHE_TTL_SECONDS);
-  return result;
+      const { trend, confidence } = forest.predict(currentFeatures);
+      const signals = buildTechnicalSignals(indicators);
+      const sectorContext = getSectorMarketContext(normSymbol);
+
+      const result = {
+        symbol: normSymbol,
+        trend, // "bullish" | "bearish" | "neutral"
+        prediction: trend.charAt(0).toUpperCase() + trend.slice(1), // "Bullish" | "Bearish" | "Neutral"
+        confidence, // e.g. 78
+        horizon: "5–10 Trading Days",
+        signals,
+        events: [],
+        events_summary: "No major external event was identified from the available data.",
+        external_factors: [sectorContext],
+        risks: [
+          "Market volatility",
+          "Prediction uncertainty",
+          "Macroeconomic shifts",
+        ],
+        model: {
+          name: "Random Forest",
+          type: "Ensemble Classifier",
+          updatedAt: new Date().toISOString(),
+        },
+        news_status: "ready_for_news_provider",
+        disclaimer:
+          "AI predictions are statistical estimates for simulated trading and are not guaranteed financial advice.",
+      };
+
+      cacheSet(cacheKey, result, AI_CACHE_TTL_SECONDS);
+      return result;
+    } catch (err) {
+      const staleInsights = cacheGetStale(cacheKey);
+      if (staleInsights) {
+        return staleInsights;
+      }
+      throw err;
+    } finally {
+      inFlightAiRequests.delete(inFlightKey);
+    }
+  })();
+
+  inFlightAiRequests.set(inFlightKey, aiPromise);
+  return aiPromise;
 }
 
 export default {

@@ -7,6 +7,9 @@ export async function getStockInsights(req, res, next) {
     const insights = await aiPredictionService.getStockInsights(symbol, refresh);
     res.json({ success: true, data: { insights } });
   } catch (error) {
+    if (/rate limit|too many requests|credits/i.test(error.message || "")) {
+      error.status = 429;
+    }
     next(error);
   }
 }
