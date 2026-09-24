@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PageLayout from "../components/layout/PageLayout.jsx";
 import api, { fetchWithCache, CACHE_TTLS } from "../utils/api.js";
-import DashboardAIMarketIntelligence from "../components/dashboard/DashboardAIMarketIntelligence.jsx";
 import {
   Card,
   Badge,
@@ -273,9 +272,23 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* AI Market Intelligence Section */}
-          <DashboardAIMarketIntelligence stocks={stocks} />
+          {/* AI Predictions Promo */}
+          <div className="rounded-2xl border border-primary/20 bg-primary-muted/10 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">AI Market Predictions</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Generate Random Forest predictions for any stock on demand — no automatic loading.
+              </p>
+            </div>
+            <Link
+              to="/ai-predictions"
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow hover:opacity-90 transition"
+            >
+              Go to AI Predictions
+            </Link>
+          </div>
         </div>
+
       )}
     </PageLayout>
   );

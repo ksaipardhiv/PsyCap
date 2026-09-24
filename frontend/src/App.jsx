@@ -11,7 +11,9 @@ import PortfolioPage from "./pages/PortfolioPage.jsx";
 import WatchlistPage from "./pages/WatchlistPage.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
+import AIPredictionsPage from "./pages/AIPredictionsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+
 
 function AppRoutes() {
   const { user } = useAuth();
@@ -67,6 +69,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/ai-predictions"
+        element={
+          <ProtectedRoute>
+            <AIPredictionsPage />
+          </ProtectedRoute>
+        }
+      />
+
 
       <Route
         path="/watchlist"
