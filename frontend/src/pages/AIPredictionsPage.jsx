@@ -18,14 +18,12 @@ import { fetchWithCache, invalidateCache, CACHE_TTLS } from "../utils/api.js";
 
 const POPULAR_STOCKS = [
   { symbol: "AAPL", name: "Apple Inc." },
-  { symbol: "MSFT", name: "Microsoft Corporation" },
-  { symbol: "NVDA", name: "NVIDIA Corporation" },
-  { symbol: "AMZN", name: "Amazon.com, Inc." },
   { symbol: "TSLA", name: "Tesla, Inc." },
-  { symbol: "GOOGL", name: "Alphabet Inc." },
-  { symbol: "META", name: "Meta Platforms, Inc." },
-  { symbol: "JPM", name: "JPMorgan Chase & Co." },
+  { symbol: "AMZN", name: "Amazon.com, Inc." },
+  { symbol: "NVDA", name: "NVIDIA Corporation" },
+  { symbol: "MSFT", name: "Microsoft Corporation" },
 ];
+
 
 export default function AIPredictionsPage() {
   const [selectedSymbol, setSelectedSymbol] = useState("");
